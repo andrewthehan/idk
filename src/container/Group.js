@@ -1,5 +1,6 @@
 import React, { Component, PropTypes } from 'react';
 import { browserHistory } from 'react-router';
+import TiTimes from 'react-icons/lib/ti/times';
 import TiTrash from 'react-icons/lib/ti/trash';
 import MdInsertLink from 'react-icons/lib/md/insert-link';
 import ReactTooltip from 'react-tooltip';
@@ -17,7 +18,7 @@ const propTypes = {
 const style = {
   content: {
     width: '50%',
-    minWidth: '640px'
+    minWidth: '840px'
   },
   column: {
     alignSelf: 'flex-start'
@@ -43,6 +44,8 @@ class Group extends Component {
     this.handleDecide = this.handleDecide.bind(this);
     this.handleClear = this.handleClear.bind(this);
     this.handleDeleteGroup = this.handleDeleteGroup.bind(this);
+    this.handleChangeName = this.handleChangeName.bind(this);
+    this.handleDeleteOption = this.handleDeleteOption.bind(this);
 
     this.state = {
       loaded: false,
@@ -108,6 +111,15 @@ class Group extends Component {
         });
       });
 
+      FirebaseUtil.on('groups/' + this.props.params.id + '/options', 'child_changed', data => {
+        let index = this.state.options.map(i => i.created).indexOf(data.val().created);
+        let options = this.state.options;
+        options[index].name = data.val().name;
+        this.setState({
+          options
+        });
+      });
+
       resolve();
     });
   }
@@ -128,9 +140,6 @@ class Group extends Component {
 
       resolve();
     });
-  }
-
-  setSelectedIndex(index) {
   }
 
   handleChange(e) {
@@ -189,6 +198,36 @@ class Group extends Component {
       });
   }
 
+  handleChangeName(e, index) {
+    FirebaseUtil.once('groups/' + this.props.params.id + '/options', 'value', data => {
+      let i = 0;
+      data.forEach(option => {
+        if(i === index){
+          FirebaseUtil.set('groups/' + this.props.params.id + '/options/' + option.key + '/name', e.target.value);
+        }
+        ++i;
+      });
+    });
+  }
+
+  handleDeleteOption(index) {
+    FirebaseUtil.once('groups/' + this.props.params.id + '/options', 'value', data => {
+      let i = 0;
+      data.forEach(option => {
+        if(i === index){
+          FirebaseUtil.delete('groups/' + this.props.params.id + '/options/' + option.key);
+          if(i === this.state.selectedIndex){
+            FirebaseUtil.set('groups/' + this.props.params.id + '/selectedIndex', -1);
+          }
+          else if(i < this.state.selectedIndex){
+            FirebaseUtil.set('groups/' + this.props.params.id + '/selectedIndex', this.state.selectedIndex - 1);
+          }
+        }
+        ++i;
+      });
+    });
+  }
+
   render() {
     return (
       this.state.loaded 
@@ -196,14 +235,14 @@ class Group extends Component {
             <h1>
               <span className={'accent'}>Group {this.props.params.id}</span>
               <MdInsertLink
-                className={'gap clipboard'}
+                className={'gap clickable-icon'}
                 data-clipboard-text={window.location.href}
                 data-tip="Copy link to clipboard"
               />
               <ReactTooltip place="bottom" effect="solid" />
             </h1>
             <div className={'flex-container-row flex-center'} style={style.content}>
-              <div className={'gap flex-fill flex-container-column'} style={style.column}>
+              <div className={'flex-fill flex-container-column'} style={style.column}>
                 <h2 className={'gap'}><span className={'accent'}>Created On</span>: {this.state.created}</h2>
 
                 <h2 className={'gap'}><span className={'accent'}>Decide Count</span>: {this.state.decideCount}</h2>
@@ -211,9 +250,9 @@ class Group extends Component {
                 <button className={'gap'} onClick={this.handleDecide}>Decide</button>
               </div>
 
-              <div className={'gap flex-fill flex-container-column'} style={style.column}>
+              <div className={'flex-fill flex-container-column'} style={style.column}>
                 <form className={'gap flex-container-row flex-space-between'} onSubmit={this.handleAdd}>
-                  <input className={'gap full-width'} type="text" value={this.state.toAdd} onChange={this.handleChange}></input>
+                  <input className={'gap full-width'} type="text" value={this.state.toAdd} onChange={this.handleChange} />
                   <input className={'gap'} type="submit" value="Submit" />
                 </form>
 
@@ -222,8 +261,20 @@ class Group extends Component {
                   title={'Options'}
                   elements={this.state.options}
                   keyMap={i => i.created}
-                  renderMap={i => i.name}
-                  selectedIndex={this.state.selectedIndex}
+                  renderMap={(i, index, isHovered) => 
+                    <div className={'flex-container-row flex-space-between'}>
+                      <input
+                        className={'flex-fill invisible-background-color ' + (index === this.state.selectedIndex ? 'selected' : '')}
+                        type="text"
+                        value={i.name}
+                        onChange={e => this.handleChangeName(e, index)}
+                      />
+                      <TiTimes
+                        className={isHovered ? 'clickable-icon' : 'invisible-color'}
+                        onClick={() => this.handleDeleteOption(index)}
+                      />
+                    </div>
+                  }
                 />
 
                 <button

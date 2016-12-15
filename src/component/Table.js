@@ -6,10 +6,35 @@ const propTypes = {
   elements: PropTypes.array.isRequired,
   keyMap: PropTypes.func.isRequired,
   renderMap: PropTypes.func.isRequired,
-  selectedIndex: PropTypes.number
 };
 
 class Table extends Component {
+
+  constructor() {
+    super();
+
+    this.handleMouseOver = this.handleMouseOver.bind(this);
+    this.handleMouseOut = this.handleMouseOut.bind(this);
+
+    this.state = {
+      hoveredIndex: -1
+    };
+  }
+
+  handleMouseOver(index) {
+    this.setState({
+      hoveredIndex: index
+    });
+  }
+
+  handleMouseOut(index) {
+    if(index === this.state.hoveredIndex){
+      this.setState({
+        hoveredIndex: -1
+      });
+    }
+  }
+
   render() {
     return (
       <table className={'gap full-width'}>
@@ -21,8 +46,10 @@ class Table extends Component {
         <tbody className={'scroll-view-y'} style={{height: this.props.height}}>
           {
             this.props.elements.map((i, index) => 
-              <tr className={index === this.props.selectedIndex ? 'selected' : ''} key={this.props.keyMap(i)}>
-                <td className={index === this.props.selectedIndex ? 'selected' : ''}>{this.props.renderMap(i)}</td>
+              <tr key={this.props.keyMap(i)}>
+                <td onMouseOver={() => this.handleMouseOver(index)} onMouseOut={() => this.handleMouseOut(index)}>
+                  {this.props.renderMap(i, index, index === this.state.hoveredIndex)}
+                </td>
               </tr>
             )
           }

@@ -2,6 +2,9 @@
 
 * {
   font-family: 'Coming Soon', sans-serif;
+  -webkit-box-sizing: border-box; /* Safari/Chrome, other WebKit */
+  -moz-box-sizing: border-box;    /* Firefox, other Gecko */
+  box-sizing: border-box;         /* Opera/IE 8+ */
 }
 
 p > a {
@@ -103,9 +106,18 @@ td {
   color: #00ADB5;
 }
 
-tr.selected, td.selected {
-  background-color: #FFD633;
-  color: white;
+.selected {
+  border: 2px solid #E23E57;
+}
+
+::-webkit-scrollbar {
+  background-color: #EEEEEE;
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #00ADB5;
+  border: 1px solid white;
 }
 
 .accent {
@@ -168,11 +180,19 @@ tr.selected, td.selected {
   overflow-y: auto;
 }
 
-.clipboard {
+.clickable-icon {
   color: black;
 }
 
-.clipboard:hover {
+.clickable-icon:hover {
   cursor: pointer;
   color: #08D9D6;
+}
+
+.invisible-color {
+  color: rgba(0, 0, 0, 0);
+}
+
+.invisible-background-color {
+  background-color: rgba(0, 0, 0, 0);
 }
