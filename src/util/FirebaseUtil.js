@@ -1,6 +1,10 @@
 import * as firebase from 'firebase';
 
 class FirebaseUtil {
+  static getCurrentUser() {
+    return firebase.auth().currentUser;
+  }
+
   static signIn() {
     return new Promise((resolve, reject) => {
       firebase.auth().signInAnonymously()

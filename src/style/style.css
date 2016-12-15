@@ -65,9 +65,6 @@ button.disabled {
 }
 
 input {
-  padding: 8px;
-  font-size: 125%;
-
   border: none;
   background-color: white;
   color: #00ADB5;
@@ -88,13 +85,8 @@ table {
   border: 1px solid #00ADB5;
 }
 
-tr:nth-child(even) {
+tr:nth-child(odd) {
   background-color: #E0F7FA;
-}
-
-th, td {
-  text-align: center;
-  font-size: 150%;
 }
 
 th {
@@ -168,6 +160,14 @@ td {
 
 .flex-center {
   justify-content: center;
+}
+
+.flex-end {
+  justify-content: flex-end;
+}
+
+.flex-stretch-items {
+  align-items: stretch;
 }
 
 .flex-fill {

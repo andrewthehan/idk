@@ -2,10 +2,12 @@ import React, { Component, PropTypes } from 'react';
 
 const propTypes = {
   height: PropTypes.string.isRequired,
+  fontSize: PropTypes.string.isRequired,
+  reverse: PropTypes.bool,
   title: PropTypes.string.isRequired,
   elements: PropTypes.array.isRequired,
   keyMap: PropTypes.func.isRequired,
-  renderMap: PropTypes.func.isRequired,
+  renderMap: PropTypes.func.isRequired
 };
 
 class Table extends Component {
@@ -37,16 +39,16 @@ class Table extends Component {
 
   render() {
     return (
-      <table className={'gap full-width'}>
+      <table className={'full-width'} style={{}}>
         <thead>
           <tr>
             <th>{this.props.title}</th>
           </tr>
         </thead>
-        <tbody className={'scroll-view-y'} style={{height: this.props.height}}>
+        <tbody className={'scroll-view-y flex-container-column flex-stretch-items ' + (this.props.reverse ? 'flex-end' : '')} style={{height: this.props.height}}>
           {
             this.props.elements.map((i, index) => 
-              <tr key={this.props.keyMap(i)}>
+              <tr key={this.props.keyMap(i)} style={{fontSize: this.props.fontSize}}>
                 <td onMouseOver={() => this.handleMouseOver(index)} onMouseOut={() => this.handleMouseOut(index)}>
                   {this.props.renderMap(i, index, index === this.state.hoveredIndex)}
                 </td>

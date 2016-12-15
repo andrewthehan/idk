@@ -17,11 +17,26 @@ const propTypes = {
 
 const style = {
   content: {
-    width: '50%',
-    minWidth: '840px'
+    width: '80%'
   },
   column: {
+    margin: '5%',
     alignSelf: 'flex-start'
+  },
+  optionInput: {
+    padding: '4px',
+    fontSize: '120%'
+  },
+  optionRow: {
+    padding: '4px',
+    fontSize: '120%'
+  },
+  chatInput: {
+    padding: '4px',
+    fontSize: '110%'
+  },
+  chatSend: {
+    fontSize: '100%'
   },
   trash: {
     position: 'absolute',
@@ -34,29 +49,38 @@ const style = {
   }
 }
 
+const systemMessagePrefix = '[System]: ';
+const joinString = ' has joined the group.';
+const leaveString = ' has left the group.';
+
 class Group extends Component {
 
   constructor() {
     super();
 
-    this.handleAdd = this.handleAdd.bind(this);
-    this.handleChange = this.handleChange.bind(this);
+    this.handleOptionAdd = this.handleOptionAdd.bind(this);
+    this.handleOptionInputChange = this.handleOptionInputChange.bind(this);
     this.handleDecide = this.handleDecide.bind(this);
     this.handleClear = this.handleClear.bind(this);
-    this.handleDeleteGroup = this.handleDeleteGroup.bind(this);
     this.handleChangeName = this.handleChangeName.bind(this);
     this.handleDeleteOption = this.handleDeleteOption.bind(this);
+    this.handleChatSend = this.handleChatSend.bind(this);
+    this.handleChatInputChange = this.handleChatInputChange.bind(this);
+    this.handleDeleteGroup = this.handleDeleteGroup.bind(this);
 
     this.state = {
       loaded: false,
-      toAdd: '',
+      user: '',
+      optionInputString: '',
       options: [],
       selectedIndex: -1,
-      decideCount: 0
+      decideCount: 0,
+      chatInputString: '',
+      messages: []
     };
   }
 
-  componentDidMount() {
+  componentWillMount() {
     Promise.resolve()
       .then(() => FirebaseUtil.signIn())
       .catch(route => {
@@ -73,25 +97,41 @@ class Group extends Component {
         }
         browserHistory.push(route);
       })
+      .then(() => setTimeout(() => {
+        let prefix =
+          systemMessagePrefix +
+          '\'' + 
+            this.state.user +
+            ' (' +
+              FirebaseUtil.getCurrentUser().uid.substring(0, 6) +
+            ')' + 
+          '\''
+        ;
+        this.addChatMessage(prefix + joinString);
+        window.onbeforeunload = () => this.addChatMessage(prefix + leaveString);
+      }, 2000));
   }
 
   bind() {
-    return new Promise((resolve, reject) => {
-      FirebaseUtil.once('groups/' + this.props.params.id, 'value', data => {
-        let date = new Date(data.val().created);
-        this.setState({
-          created: date.toString()
+    return (
+      new Promise((resolve, reject) => {
+        FirebaseUtil.once('groups/' + this.props.params.id, 'value', data => {
+          let date = new Date(data.val().created);
+          this.setState({
+            created: date.toString()
+          });
+          resolve()
         });
-        resolve()
-      });
-    })
+      })
       .then(() => this.bindOptions())
+      .then(() => this.bindMessages())
       .then(() => this.bindFields())
       .then(() => {
         this.setState({
           loaded: true
         });
-      });
+      })
+    );
   }
 
   bindOptions() {
@@ -124,6 +164,27 @@ class Group extends Component {
     });
   }
 
+  bindMessages() {
+    return new Promise((resolve, reject) => {
+      FirebaseUtil.on('groups/' + this.props.params.id + '/messages', 'child_added', data => {
+        this.state.messages.push(data.val());
+        this.setState({
+          messages: this.state.messages
+        });
+      });
+
+      FirebaseUtil.on('groups/' + this.props.params.id + '/messages', 'child_removed', data => {
+        let index = this.state.messages.map(i => i.created).indexOf(data.val().created);
+        this.state.messages.splice(index, 1);
+        this.setState({
+          messages: this.state.messages
+        });
+      });
+
+      resolve();
+    });
+  }
+
   bindFields() {
     return new Promise((resolve, reject) => {
       FirebaseUtil.on('groups/' + this.props.params.id + '/selectedIndex', 'value', data => {
@@ -142,25 +203,34 @@ class Group extends Component {
     });
   }
 
-  handleChange(e) {
+  addChatMessage(message) {
+    if(message !== '') {
+      FirebaseUtil.push('groups/' + this.props.params.id + '/messages', {
+        name: message,
+        created: Date.now()
+      });
+    }
+  }
+
+  handleOptionInputChange(e) {
     this.setState({
-      toAdd: e.target.value
+      optionInputString: e.target.value
     })
   }
 
-  handleAdd(e) {
+  handleOptionAdd(e) {
     e.preventDefault();
 
-    const toAdd = this.state.toAdd.trim();
+    const optionInputString = this.state.optionInputString.trim();
 
-    if(toAdd !== '') {
+    if(optionInputString !== '') {
       FirebaseUtil.push('groups/' + this.props.params.id + '/options', {
-        name: toAdd,
+        name: optionInputString,
         created: Date.now()
       });
 
       this.setState({
-        toAdd: "",
+        optionInputString: "",
       });
     
       FirebaseUtil.set('groups/' + this.props.params.id + '/selectedIndex', -1);
@@ -174,6 +244,8 @@ class Group extends Component {
       FirebaseUtil.set('groups/' + this.props.params.id + '/selectedIndex', index);
 
       FirebaseUtil.transaction('groups/' + this.props.params.id + '/decideCount', data => data + 1);
+
+      this.addChatMessage(systemMessagePrefix + ' decided on \'' + this.state.options[index].name + '\'.');
     }
   }
 
@@ -183,19 +255,6 @@ class Group extends Component {
         .then(() => FirebaseUtil.delete('groups/' + this.props.params.id + '/options'))
         .then(() => FirebaseUtil.set('groups/' + this.props.params.id + '/selectedIndex', -1));
     }
-  }
-
-  handleDeleteGroup() {
-    Promise.resolve()
-      .then(() => FirebaseUtil.delete('groups/' + this.props.params.id))
-      .then(() => FirebaseUtil.signOut())
-      .then(() => browserHistory.push('/idk'))
-      .catch(route => {
-        if(!(route instanceof String)){
-          route = '/idk/help';
-        }
-        browserHistory.push(route);
-      });
   }
 
   handleChangeName(e, index) {
@@ -228,6 +287,46 @@ class Group extends Component {
     });
   }
 
+  handleChatInputChange(e) {
+    this.setState({
+      chatInputString: e.target.value
+    })
+  }
+
+  handleChatSend(e) {
+    e.preventDefault();
+
+    if(this.state.chatInputString.trim().length > 0){
+      let prefix =
+        '[' + 
+          this.state.user +
+          ' (' +
+            FirebaseUtil.getCurrentUser().uid.substring(0, 6) +
+          ')' + 
+        ']: '
+      ;
+
+      this.addChatMessage(prefix + this.state.chatInputString.trim());
+
+      this.setState({
+        chatInputString: "",
+      });
+    }
+  }
+
+  handleDeleteGroup() {
+    Promise.resolve()
+      .then(() => FirebaseUtil.delete('groups/' + this.props.params.id))
+      .then(() => FirebaseUtil.signOut())
+      .then(() => browserHistory.push('/idk'))
+      .catch(route => {
+        if(!(route instanceof String)){
+          route = '/idk/help';
+        }
+        browserHistory.push(route);
+      });
+  }
+
   render() {
     return (
       this.state.loaded 
@@ -241,23 +340,56 @@ class Group extends Component {
               />
               <ReactTooltip place="bottom" effect="solid" />
             </h1>
-            <div className={'flex-container-row flex-center'} style={style.content}>
-              <div className={'flex-fill flex-container-column'} style={style.column}>
+            <div className={'flex-container-row flex-space-around'} style={style.content}>
+              <div className={'gap flex-fill flex-container-column'} style={style.column}>
                 <h2 className={'gap'}><span className={'accent'}>Created On</span>: {this.state.created}</h2>
 
                 <h2 className={'gap'}><span className={'accent'}>Decide Count</span>: {this.state.decideCount}</h2>
 
                 <button className={'gap'} onClick={this.handleDecide}>Decide</button>
+
+                <Table
+                  height={'400px'}
+                  fontSize={'105%'}
+                  reverse
+                  title={'Chat'}
+                  elements={this.state.messages}
+                  keyMap={i => i.created}
+                  renderMap={(i, index, isHovered) => 
+                    <div>
+                      {i.name}
+                    </div>
+                  }
+                />
+                <form className={'flex-container-row flex-space-between'} onSubmit={this.handleChatSend}>
+                  <input
+                    className={'full-width'}
+                    style={style.chatInput}
+                    type="text"
+                    value={this.state.chatInputString}
+                    placeholder="Input a message"
+                    onChange={this.handleChatInputChange}
+                  />
+                  <input style={style.chatSend} type="submit" value="Send" />
+                </form>
               </div>
 
-              <div className={'flex-fill flex-container-column'} style={style.column}>
-                <form className={'gap flex-container-row flex-space-between'} onSubmit={this.handleAdd}>
-                  <input className={'gap full-width'} type="text" value={this.state.toAdd} onChange={this.handleChange} />
-                  <input className={'gap'} type="submit" value="Submit" />
+              <div className={'gap flex-fill flex-container-column'} style={style.column}>
+                <form className={'gap flex-container-row flex-space-between'} onSubmit={this.handleOptionAdd}>
+                  <input
+                    className={'gap full-width'}
+                    style={style.optionInput}
+                    type="text"
+                    value={this.state.optionInputString}
+                    placeholder="Input an option"
+                    onChange={this.handleOptionInputChange}
+                  />
+                  <input className={'gap'} type="submit" value="Add" />
                 </form>
 
                 <Table
                   height={'500px'}
+                  fontSize={'125%'}
                   title={'Options'}
                   elements={this.state.options}
                   keyMap={i => i.created}
@@ -265,6 +397,7 @@ class Group extends Component {
                     <div className={'flex-container-row flex-space-between'}>
                       <input
                         className={'flex-fill invisible-background-color ' + (index === this.state.selectedIndex ? 'selected' : '')}
+                        style={style.optionRow}
                         type="text"
                         value={i.name}
                         onChange={e => this.handleChangeName(e, index)}
@@ -278,7 +411,7 @@ class Group extends Component {
                 />
 
                 <button
-                  className={'full-width ' + (this.state.options.length === 0 ? 'disabled' : 'alert')}
+                  className={'gap full-width ' + (this.state.options.length === 0 ? 'disabled' : 'alert')}
                   onClick={this.handleClear}
                   disabled={this.state.options.length === 0}
                 >
