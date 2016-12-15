@@ -48,7 +48,7 @@ class About extends Component {
           </p>
 
           <p className={'gap'}>
-            https://andrewthehan.github.io/idk/<Link className={'alert'} to={'idk/' + randomId}>{randomId}</Link>
+            https://andrewthehan.github.io/idk/<Link className={'alert'} to={'/idk/' + randomId}>{randomId}</Link>
           </p>
         </div>
 

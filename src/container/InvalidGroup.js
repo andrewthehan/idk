@@ -49,7 +49,7 @@ class InvalidGroup extends Component {
 
   handleClick() {
     let id = this.createGroup();
-    browserHistory.push('/' + id);
+    browserHistory.push('/idk/' + id);
   }
 
   createGroup() {

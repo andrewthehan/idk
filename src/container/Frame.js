@@ -15,8 +15,8 @@ class Frame extends Component {
           {this.props.children}
         </div>
         <div className={'flex-container-row flex-space-around'} style={style.links}>
-          <Link to={'idk/'}>Home</Link>
-          <Link to={'idk/about'}>About</Link>
+          <Link to={'/idk'}>Home</Link>
+          <Link to={'/idk/about'}>About</Link>
           <a href="https://github.com/andrewthehan/idk" target="_blank">Github</a>
         </div>
       </div>
