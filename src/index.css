@@ -1,0 +1,16 @@
+body {
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  font-family: sans-serif;
+
+  background-color: #EEEEEE;
+  color: #393E46;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
