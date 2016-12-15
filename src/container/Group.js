@@ -4,9 +4,8 @@ import TiTrash from 'react-icons/lib/ti/trash';
 import MdInsertLink from 'react-icons/lib/md/insert-link';
 import ReactTooltip from 'react-tooltip';
 
-import * as firebase from 'firebase';
-
 import Table from '../component/Table';
+import FirebaseUtil from '../util/FirebaseUtil';
 import MathUtil from '../util/MathUtil';
 
 const propTypes = {
@@ -54,42 +53,34 @@ class Group extends Component {
     };
   }
 
-  componentDidMount(){
+  componentDidMount() {
     Promise.resolve()
-      .then(() => this.getGroup())
+      .then(() => FirebaseUtil.signIn())
+      .catch(route => {
+        if(!(route instanceof String)){
+          route = '/idk/help';
+        }
+        browserHistory.push(route);
+      })
+      .then(() => FirebaseUtil.exists('groups/' + this.props.params.id))
       .then(() => this.bind())
-      .catch(() => {
-        browserHistory.push('/idk/' + this.props.params.id + '/invalid');
-      });
-  }
-
-  getGroup() {
-    const group = firebase.database().ref('groups/' + this.props.params.id);
-
-    return new Promise((resolve, reject) => {
-      group.once('value', data => {
-        if(data.val() == null) {
-          reject();
+      .catch(route => {
+        if(!(route instanceof String)){
+          route = '/idk/' + this.props.params.id + '/invalid';
         }
-        else {
-          resolve();
-        }
-      });
-    }); 
+        browserHistory.push(route);
+      })
   }
 
   bind() {
-    new Promise((resolve, reject) => {
-      const group = firebase.database().ref('groups/' + this.props.params.id);
-
-      group.once('value', data => {
+    return new Promise((resolve, reject) => {
+      FirebaseUtil.once('groups/' + this.props.params.id, 'value', data => {
         let date = new Date(data.val().created);
         this.setState({
           created: date.toString()
         });
+        resolve()
       });
-
-      resolve();
     })
       .then(() => this.bindOptions())
       .then(() => this.bindFields())
@@ -102,20 +93,18 @@ class Group extends Component {
 
   bindOptions() {
     return new Promise((resolve, reject) => {
-      const groupOptions = firebase.database().ref('groups/' + this.props.params.id + '/options');
-
-      const options = this.state.options;
-
-      groupOptions.on('child_added', data => {
-        options.push(data.val());
-        this.setState(options);
+      FirebaseUtil.on('groups/' + this.props.params.id + '/options', 'child_added', data => {
+        this.state.options.push(data.val());
+        this.setState({
+          options: this.state.options
+        });
       });
 
-      groupOptions.on('child_removed', data => {
+      FirebaseUtil.on('groups/' + this.props.params.id + '/options', 'child_removed', data => {
         let index = this.state.options.map(i => i.created).indexOf(data.val().created);
-        options.splice(index, 1);
+        this.state.options.splice(index, 1);
         this.setState({
-          options
+          options: this.state.options
         });
       });
 
@@ -125,17 +114,13 @@ class Group extends Component {
 
   bindFields() {
     return new Promise((resolve, reject) => {
-      const groupSelectedIndex = firebase.database().ref('groups/' + this.props.params.id + '/selectedIndex');
-
-      groupSelectedIndex.on('value', data => {
+      FirebaseUtil.on('groups/' + this.props.params.id + '/selectedIndex', 'value', data => {
         this.setState({
           selectedIndex: data.val()
         });
       });
-    
-      const groupDecideCount = firebase.database().ref('groups/' + this.props.params.id + '/decideCount');
 
-      groupDecideCount.on('value', data => {
+      FirebaseUtil.on('groups/' + this.props.params.id + '/decideCount', 'value', data => {
         this.setState({
           decideCount: data.val()
         });
@@ -146,12 +131,6 @@ class Group extends Component {
   }
 
   setSelectedIndex(index) {
-    this.setState({
-      selectedIndex: index
-    });
-
-    const groupSelectedIndex = firebase.database().ref('groups/' + this.props.params.id + '/selectedIndex');
-    groupSelectedIndex.set(index);
   }
 
   handleChange(e) {
@@ -165,59 +144,49 @@ class Group extends Component {
 
     const toAdd = this.state.toAdd.trim();
 
-    if(toAdd !== ''){
-      const groupOptions = firebase.database().ref('groups/' + this.props.params.id + '/options');
-
-      groupOptions.push({
-        created: Date.now(),
-        name: toAdd
+    if(toAdd !== '') {
+      FirebaseUtil.push('groups/' + this.props.params.id + '/options', {
+        name: toAdd,
+        created: Date.now()
       });
 
       this.setState({
         toAdd: "",
       });
-
-      this.setSelectedIndex(-1);
+    
+      FirebaseUtil.set('groups/' + this.props.params.id + '/selectedIndex', -1);
     }
   }
 
   handleDecide() {
-    if(this.state.options.length !== 0){
+    if(this.state.options.length !== 0) {
       let index = MathUtil.getRandomInt(0, this.state.options.length);
-      this.setSelectedIndex(index);
 
-      let decideCount = this.state.decideCount + 1;
+      FirebaseUtil.set('groups/' + this.props.params.id + '/selectedIndex', index);
 
-      this.setState({
-        decideCount
-      });
-
-      const groupDecideCount = firebase.database().ref('groups/' + this.props.params.id + '/decideCount');
-      groupDecideCount.transaction(data => data + 1);
+      FirebaseUtil.transaction('groups/' + this.props.params.id + '/decideCount', data => data + 1);
     }
   }
 
   handleClear() {
-    if(this.state.options.length > 0){
-      const groupOptions = firebase.database().ref('groups/' + this.props.params.id + '/options');
-
-      groupOptions
-        .remove()
-        .then(() => this.bindOptions());
-
-      this.setState({
-        options: [],
-        selectedIndex: -1
-      });
+    if(this.state.options.length > 0) {
+      Promise.resolve()
+        .then(() => FirebaseUtil.delete('groups/' + this.props.params.id + '/options'))
+        .then(() => FirebaseUtil.set('groups/' + this.props.params.id + '/selectedIndex', -1));
     }
   }
 
   handleDeleteGroup() {
-    const group = firebase.database().ref('groups/' + this.props.params.id);
-
-    group
-      .remove()
-      .then(() => browserHistory.push('/idk'));
+    Promise.resolve()
+      .then(() => FirebaseUtil.delete('groups/' + this.props.params.id))
+      .then(() => FirebaseUtil.signOut())
+      .then(() => browserHistory.push('/idk'))
+      .catch(route => {
+        if(!(route instanceof String)){
+          route = '/idk/help';
+        }
+        browserHistory.push(route);
+      });
   }
 
   render() {
@@ -225,7 +194,7 @@ class Group extends Component {
       this.state.loaded 
         ? <div className={'flex-container-column'}>
             <h1>
-              Group '{this.props.params.id}'
+              <span className={'accent'}>Group {this.props.params.id}</span>
               <MdInsertLink
                 className={'gap clipboard'}
                 data-clipboard-text={window.location.href}
@@ -235,15 +204,9 @@ class Group extends Component {
             </h1>
             <div className={'flex-container-row flex-center'} style={style.content}>
               <div className={'gap flex-fill flex-container-column'} style={style.column}>
-                <div className={'gap flex-container-row'}>
-                  <h2 className={'gap'}>Created on:</h2>
-                  <p className={'gap'}>{this.state.created}</p>
-                </div>
+                <h2 className={'gap'}><span className={'accent'}>Created On</span>: {this.state.created}</h2>
 
-                <div className={'gap flex-container-row'}>
-                  <h2 className={'gap'}>Decide Count:</h2>
-                  <p className={'gap'}>{this.state.decideCount}</p>
-                </div>
+                <h2 className={'gap'}><span className={'accent'}>Decide Count</span>: {this.state.decideCount}</h2>
 
                 <button className={'gap'} onClick={this.handleDecide}>Decide</button>
               </div>

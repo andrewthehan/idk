@@ -4,6 +4,10 @@
   font-family: 'Coming Soon', sans-serif;
 }
 
+p > a {
+  font-size: 110%;
+}
+
 a, p {
   font-size: 175%
 }
@@ -102,6 +106,14 @@ td {
 tr.selected, td.selected {
   background-color: #FFD633;
   color: white;
+}
+
+.accent {
+  color: #00ADB5;
+}
+
+.accent:hover {
+  color: #08D9D6;
 }
 
 .gap {

@@ -1,8 +1,9 @@
 import React, { Component } from 'react';
 import { browserHistory, Link } from 'react-router';
 
-import * as firebase from 'firebase';
 import shortid from 'shortid';
+
+import FirebaseUtil from '../util/FirebaseUtil';
 
 class About extends Component {
 
@@ -18,10 +19,22 @@ class About extends Component {
 
   createGroup() {
     let id = shortid.generate();
-    firebase.database().ref('groups/' + id).set({
-      created: Date.now(),
-      decideCount: 0
-    });
+
+    Promise.resolve()
+      .then(FirebaseUtil.signIn)
+      .then(() => {
+        FirebaseUtil.set('groups/' + id, {
+          created: Date.now(),
+          decideCount: 0
+        });
+      })
+      .catch(route => {
+        if(!(route instanceof String)){
+          route = '/idk/help';
+        }
+        browserHistory.push(route);
+      });
+
     return id;
   }
 
@@ -32,7 +45,7 @@ class About extends Component {
       <div className={'flex-container-column flex-center'}>
         <div className={'flex-container-column flex-center'}>
           <p className={'gap'}>
-            idk helps groups make decisions. Provide it the options and let it decide for you.
+            <span className={'accent'}>idk</span> helps groups make decisions. Provide it the options and let it decide for you.
           </p>
 
           <p className={'gap'}>
@@ -53,7 +66,7 @@ class About extends Component {
         </div>
 
         <p>
-          idk was created by Andrew Han.
+          <span className={'accent'}>idk</span> was created by Andrew Han.
         </p>
       </div>
     );

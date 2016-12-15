@@ -1,7 +1,7 @@
 import React, { Component, PropTypes } from 'react';
 import { browserHistory } from 'react-router';
 
-import * as firebase from 'firebase';
+import FirebaseUtil from '../util/FirebaseUtil';
 
 const propTypes = {
   params: PropTypes.shape({
@@ -21,30 +21,14 @@ class InvalidGroup extends Component {
 
   componentDidMount(){
     Promise.resolve()
-      .then(() => this.getGroup())
-      .then(() => {
-        browserHistory.push('/idk/' + this.props.params.id);
-      })
+      .then(FirebaseUtil.signIn)
+      .then(() => FirebaseUtil.exists('groups/' + this.props.params.id))
+      .then(() => browserHistory.push('/idk/' + this.props.params.id))
       .catch(() => {
         this.setState({
           loaded: true
         });
       });
-  }
-
-  getGroup() {
-    const group = firebase.database().ref('groups/' + this.props.params.id);
-
-    return new Promise((resolve, reject) => {
-      group.once('value', data => {
-        if(data.val() == null) {
-          reject();
-        }
-        else {
-          resolve();
-        }
-      });
-    }); 
   }
 
   handleClick() {
@@ -54,10 +38,22 @@ class InvalidGroup extends Component {
 
   createGroup() {
     let id = this.props.params.id;
-    firebase.database().ref('groups/' + id).set({
-      created: Date.now(),
-      decideCount: 0
-    });
+
+    Promise.resolve()
+      .then(FirebaseUtil.signIn)
+      .then(() => {
+        FirebaseUtil.set('groups/' + id, {
+          created: Date.now(),
+          decideCount: 0
+        });
+      })
+      .catch(route => {
+        if(!(route instanceof String)){
+          route = '/idk/help';
+        }
+        browserHistory.push(route);
+      });
+
     return id;
   }
 
@@ -67,7 +63,7 @@ class InvalidGroup extends Component {
         ?
           <div className={'flex-container-column flex-center'}>
             <p className={'gap'} style={{fontSize: '175%'}}>
-              Group '{this.props.params.id}' doesn't exist. Would you like to create it?
+              Group <span className={'accent'}>{this.props.params.id}</span> doesn't exist. Would you like to create it?
             </p>
             <button className={'gap alert'} onClick={this.handleClick}>
               Create '{this.props.params.id}'
