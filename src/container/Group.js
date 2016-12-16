@@ -5,6 +5,7 @@ import TiTrash from 'react-icons/lib/ti/trash';
 import MdInsertLink from 'react-icons/lib/md/insert-link';
 import ReactTooltip from 'react-tooltip';
 
+import Chat from '../component/Chat';
 import Table from '../component/Table';
 import FirebaseUtil from '../util/FirebaseUtil';
 import MathUtil from '../util/MathUtil';
@@ -17,10 +18,11 @@ const propTypes = {
 
 const style = {
   content: {
-    width: '80%'
+    width: '80%',
+    height: '100%'
   },
   column: {
-    margin: '5%',
+    height: '100%',
     alignSelf: 'flex-start'
   },
   optionInput: {
@@ -30,13 +32,6 @@ const style = {
   optionRow: {
     padding: '4px',
     fontSize: '120%'
-  },
-  chatInput: {
-    padding: '4px',
-    fontSize: '110%'
-  },
-  chatSend: {
-    fontSize: '100%'
   },
   trash: {
     position: 'absolute',
@@ -48,6 +43,8 @@ const style = {
     fontSize: '250%'
   }
 }
+
+const messageCountThreshould = 30;
 
 const systemMessagePrefix = '[System]: ';
 const joinString = ' has joined the group.';
@@ -64,9 +61,8 @@ class Group extends Component {
     this.handleClear = this.handleClear.bind(this);
     this.handleChangeName = this.handleChangeName.bind(this);
     this.handleDeleteOption = this.handleDeleteOption.bind(this);
-    this.handleChatSend = this.handleChatSend.bind(this);
-    this.handleChatInputChange = this.handleChatInputChange.bind(this);
     this.handleDeleteGroup = this.handleDeleteGroup.bind(this);
+    this.handleSend = this.handleSend.bind(this);
 
     this.state = {
       loaded: false,
@@ -75,41 +71,42 @@ class Group extends Component {
       options: [],
       selectedIndex: -1,
       decideCount: 0,
-      chatInputString: '',
       messages: []
     };
   }
 
   componentWillMount() {
     Promise.resolve()
-      .then(() => FirebaseUtil.signIn())
+      .then(() => FirebaseUtil.signIn()
+        .then(() => FirebaseUtil.exists('groups/' + this.props.params.id))
+        .then(() => this.bind()
+          .then(() => setTimeout(() => {
+            let prefix =
+              systemMessagePrefix +
+              '\'' + 
+                this.state.user +
+                ' (' +
+                  FirebaseUtil.getCurrentUser().uid.substring(0, 6) +
+                ')' + 
+              '\''
+            ;
+            this.addChatMessage(prefix + joinString);
+            window.onbeforeunload = () => this.addChatMessage(prefix + leaveString);
+          }, 2000))
+        )
+        .catch(route => {
+          if(!(route instanceof String)){
+            route = '/idk/' + this.props.params.id + '/invalid';
+          }
+          browserHistory.push(route);
+        })
+      )
       .catch(route => {
         if(!(route instanceof String)){
           route = '/idk/help';
         }
         browserHistory.push(route);
-      })
-      .then(() => FirebaseUtil.exists('groups/' + this.props.params.id))
-      .then(() => this.bind())
-      .catch(route => {
-        if(!(route instanceof String)){
-          route = '/idk/' + this.props.params.id + '/invalid';
-        }
-        browserHistory.push(route);
-      })
-      .then(() => setTimeout(() => {
-        let prefix =
-          systemMessagePrefix +
-          '\'' + 
-            this.state.user +
-            ' (' +
-              FirebaseUtil.getCurrentUser().uid.substring(0, 6) +
-            ')' + 
-          '\''
-        ;
-        this.addChatMessage(prefix + joinString);
-        window.onbeforeunload = () => this.addChatMessage(prefix + leaveString);
-      }, 2000));
+      });
   }
 
   bind() {
@@ -171,10 +168,17 @@ class Group extends Component {
         this.setState({
           messages: this.state.messages
         });
+        
+        if(this.state.messages.length > messageCountThreshould){
+          FirebaseUtil.once('groups/' + this.props.params.id + '/messages', 'value', data => {
+            const firstMessageKey = Object.keys(data.val())[0];
+            FirebaseUtil.delete('groups/' + this.props.params.id + '/messages/' + firstMessageKey);
+          });
+        }
       });
 
       FirebaseUtil.on('groups/' + this.props.params.id + '/messages', 'child_removed', data => {
-        let index = this.state.messages.map(i => i.created).indexOf(data.val().created);
+        const index = this.state.messages.map(i => i.created).indexOf(data.val().created);
         this.state.messages.splice(index, 1);
         this.setState({
           messages: this.state.messages
@@ -287,31 +291,16 @@ class Group extends Component {
     });
   }
 
-  handleChatInputChange(e) {
-    this.setState({
-      chatInputString: e.target.value
-    })
-  }
+  handleSend(chatString) {
+    let prefix =
+      '[' + 
+        this.state.user +
+        ' (' +
+          FirebaseUtil.getCurrentUser().uid.substring(0, 6) +
+        ')' + 
+      ']: '
 
-  handleChatSend(e) {
-    e.preventDefault();
-
-    if(this.state.chatInputString.trim().length > 0){
-      let prefix =
-        '[' + 
-          this.state.user +
-          ' (' +
-            FirebaseUtil.getCurrentUser().uid.substring(0, 6) +
-          ')' + 
-        ']: '
-      ;
-
-      this.addChatMessage(prefix + this.state.chatInputString.trim());
-
-      this.setState({
-        chatInputString: "",
-      });
-    }
+    this.addChatMessage(prefix + chatString);
   }
 
   handleDeleteGroup() {
@@ -341,40 +330,27 @@ class Group extends Component {
               <ReactTooltip place="bottom" effect="solid" />
             </h1>
             <div className={'flex-container-row flex-space-around'} style={style.content}>
-              <div className={'gap flex-fill flex-container-column'} style={style.column}>
+              <div className={'flex-fill flex-container-column'} style={style.column}>
                 <h2 className={'gap'}><span className={'accent'}>Created On</span>: {this.state.created}</h2>
 
                 <h2 className={'gap'}><span className={'accent'}>Decide Count</span>: {this.state.decideCount}</h2>
 
                 <button className={'gap'} onClick={this.handleDecide}>Decide</button>
 
-                <Table
-                  height={'400px'}
+                <div className={'gap'}>Only keeps history of the last {messageCountThreshould} messages.</div>
+                <Chat
+                  height={'60%'}
+                  width={'70%'}
                   fontSize={'105%'}
-                  reverse
                   title={'Chat'}
                   elements={this.state.messages}
                   keyMap={i => i.created}
-                  renderMap={(i, index, isHovered) => 
-                    <div>
-                      {i.name}
-                    </div>
-                  }
+                  renderMap={(i, index) => <div>{i.name}</div>}
+                  onSend={this.handleSend}
                 />
-                <form className={'flex-container-row flex-space-between'} onSubmit={this.handleChatSend}>
-                  <input
-                    className={'full-width'}
-                    style={style.chatInput}
-                    type="text"
-                    value={this.state.chatInputString}
-                    placeholder="Input a message"
-                    onChange={this.handleChatInputChange}
-                  />
-                  <input style={style.chatSend} type="submit" value="Send" />
-                </form>
               </div>
 
-              <div className={'gap flex-fill flex-container-column'} style={style.column}>
+              <div className={'flex-fill flex-container-column'} style={style.column}>
                 <form className={'gap flex-container-row flex-space-between'} onSubmit={this.handleOptionAdd}>
                   <input
                     className={'gap full-width'}
@@ -388,7 +364,8 @@ class Group extends Component {
                 </form>
 
                 <Table
-                  height={'500px'}
+                  height={'70%'}
+                  width={'80%'}
                   fontSize={'125%'}
                   title={'Options'}
                   elements={this.state.options}
@@ -411,7 +388,7 @@ class Group extends Component {
                 />
 
                 <button
-                  className={'gap full-width ' + (this.state.options.length === 0 ? 'disabled' : 'alert')}
+                  className={'gap ' + (this.state.options.length === 0 ? 'disabled' : 'alert')}
                   onClick={this.handleClear}
                   disabled={this.state.options.length === 0}
                 >

@@ -1,7 +1,9 @@
 import React, { Component, PropTypes } from 'react';
+import ReactDOM from 'react-dom';
 
 const propTypes = {
   height: PropTypes.string.isRequired,
+  width: PropTypes.string.isRequired,
   fontSize: PropTypes.string.isRequired,
   reverse: PropTypes.bool,
   title: PropTypes.string.isRequired,
@@ -19,8 +21,26 @@ class Table extends Component {
     this.handleMouseOut = this.handleMouseOut.bind(this);
 
     this.state = {
-      hoveredIndex: -1
+      hoveredIndex: -1,
+      shouldScrollToBottom: false
     };
+  }
+
+  componentWillReceiveProps() {
+    if(this.props.reverse){
+      this.setState({
+        shouldScrollToBottom: true
+      });
+    }
+  }
+
+  componentDidUpdate() {
+    if(this.state.shouldScrollToBottom){
+      this.scrollToBottom();
+      this.setState({
+        shouldScrollToBottom: false
+      });
+    }
   }
 
   handleMouseOver(index) {
@@ -37,15 +57,20 @@ class Table extends Component {
     }
   }
 
+  scrollToBottom() {
+    let node = ReactDOM.findDOMNode(this.scrollView);
+    node.scrollTop = node.scrollHeight;
+  }
+
   render() {
     return (
-      <table className={'full-width'} style={{}}>
+      <table className={'full-width flex-container-column flex-stretch-items'} style={{height: this.props.height, width: this.props.width}}>
         <thead>
           <tr>
             <th>{this.props.title}</th>
           </tr>
         </thead>
-        <tbody className={'scroll-view-y flex-container-column flex-stretch-items ' + (this.props.reverse ? 'flex-end' : '')} style={{height: this.props.height}}>
+        <tbody ref={ref => this.scrollView = ref} className={'full-width full-height scroll-view-y flex-container-column flex-stretch-items'}>
           {
             this.props.elements.map((i, index) => 
               <tr key={this.props.keyMap(i)} style={{fontSize: this.props.fontSize}}>
