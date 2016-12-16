@@ -335,7 +335,13 @@ class Group extends Component {
 
                 <h2 className={'gap'}><span className={'accent'}>Decide Count</span>: {this.state.decideCount}</h2>
 
-                <button className={'gap'} onClick={this.handleDecide}>Decide</button>
+                <button
+                  className={'gap ' + (this.state.options.length === 0 ? 'disabled' : '')}
+                  onClick={this.handleDecide}
+                  disabled={this.state.options.length === 0}
+                >
+                  Decide
+                </button>
 
                 <div className={'gap'}>Only keeps history of the last {messageCountThreshould} messages.</div>
                 <Chat

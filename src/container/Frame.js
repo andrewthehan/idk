@@ -17,7 +17,7 @@ class Frame extends Component {
         <div className={'flex-container-row flex-space-around'} style={style.links}>
           <Link to={'/idk'}>Home</Link>
           <Link to={'/idk/about'}>About</Link>
-          <a href="https://github.com/andrewthehan/idk" target="_blank">Github</a>
+          <a href="https://github.com/andrewthehan/idk" target="_blank">GitHub</a>
         </div>
       </div>
     )
