@@ -6,6 +6,7 @@ import MdInsertLink from 'react-icons/lib/md/insert-link';
 import ReactTooltip from 'react-tooltip';
 
 import Chat from '../component/Chat';
+import Confirm from '../component/Confirm';
 import Table from '../component/Table';
 import FirebaseUtil from '../util/FirebaseUtil';
 import MathUtil from '../util/MathUtil';
@@ -17,6 +18,9 @@ const propTypes = {
 };
 
 const style = {
+  userInput: {
+    fontSize: '150%'
+  },
   content: {
     width: '80%',
     height: '100%'
@@ -55,6 +59,9 @@ class Group extends Component {
   constructor() {
     super();
 
+    this.handleChooseUser = this.handleChooseUser.bind(this);
+    this.handleUserInputChange = this.handleUserInputChange.bind(this);
+
     this.handleOptionAdd = this.handleOptionAdd.bind(this);
     this.handleOptionInputChange = this.handleOptionInputChange.bind(this);
     this.handleDecide = this.handleDecide.bind(this);
@@ -64,14 +71,24 @@ class Group extends Component {
     this.handleDeleteGroup = this.handleDeleteGroup.bind(this);
     this.handleSend = this.handleSend.bind(this);
 
+    this.openConfirmModal = this.openConfirmModal.bind(this);
+    this.handleConfirmSubmit = this.handleConfirmSubmit.bind(this);
+
     this.state = {
-      loaded: false,
       user: '',
+      choosingUser: true,
+
+      loaded: false,
       optionInputString: '',
       options: [],
       selectedIndex: -1,
       decideCount: 0,
-      messages: []
+      messages: [],
+
+      confirmDeleteGroup: false,
+      confirmClear: false,
+
+      confirmModalIsOpen: false
     };
   }
 
@@ -79,21 +96,7 @@ class Group extends Component {
     Promise.resolve()
       .then(() => FirebaseUtil.signIn()
         .then(() => FirebaseUtil.exists('groups/' + this.props.params.id))
-        .then(() => this.bind()
-          .then(() => setTimeout(() => {
-            let prefix =
-              systemMessagePrefix +
-              '\'' + 
-                this.state.user +
-                ' (' +
-                  FirebaseUtil.getCurrentUser().uid.substring(0, 6) +
-                ')' + 
-              '\''
-            ;
-            this.addChatMessage(prefix + joinString);
-            window.onbeforeunload = () => this.addChatMessage(prefix + leaveString);
-          }, 2000))
-        )
+        .then(() => this.bind())
         .catch(route => {
           if(!(route instanceof String)){
             route = '/idk/' + this.props.params.id + '/invalid';
@@ -216,10 +219,38 @@ class Group extends Component {
     }
   }
 
+  handleChooseUser(e) {
+    e.preventDefault();
+
+    if(this.state.user.trim() !== '') {
+      let prefix =
+        systemMessagePrefix +
+        '\'' + 
+          this.state.user +
+          ' (' +
+            FirebaseUtil.getCurrentUser().uid.substring(0, 6) +
+          ')' + 
+        '\''
+      ;
+      this.addChatMessage(prefix + joinString);
+      window.onbeforeunload = () => this.addChatMessage(prefix + leaveString);
+
+      this.setState({
+        choosingUser: false
+      });
+    }
+  }
+
+  handleUserInputChange(e) {
+    this.setState({
+      user: e.target.value
+    });
+  }
+
   handleOptionInputChange(e) {
     this.setState({
       optionInputString: e.target.value
-    })
+    });
   }
 
   handleOptionAdd(e) {
@@ -254,11 +285,10 @@ class Group extends Component {
   }
 
   handleClear() {
-    if(this.state.options.length > 0) {
-      Promise.resolve()
-        .then(() => FirebaseUtil.delete('groups/' + this.props.params.id + '/options'))
-        .then(() => FirebaseUtil.set('groups/' + this.props.params.id + '/selectedIndex', -1));
-    }
+    this.setState({
+      confirmClear: true
+    });
+    this.openConfirmModal();
   }
 
   handleChangeName(e, index) {
@@ -304,113 +334,168 @@ class Group extends Component {
   }
 
   handleDeleteGroup() {
-    Promise.resolve()
-      .then(() => FirebaseUtil.delete('groups/' + this.props.params.id))
-      .then(() => FirebaseUtil.signOut())
-      .then(() => browserHistory.push('/idk'))
-      .catch(route => {
-        if(!(route instanceof String)){
-          route = '/idk/help';
-        }
-        browserHistory.push(route);
-      });
+    this.setState({
+      confirmDeleteGroup: true
+    });
+    this.openConfirmModal();
+  }
+
+  openConfirmModal() {
+    this.setState({
+      confirmModalIsOpen: true
+    });
+  }
+
+  closeConfirmModal() {
+    this.setState({
+      confirmModalIsOpen: false
+    })
+  }
+
+  handleConfirmSubmit(isConfirm) {
+    this.closeConfirmModal();
+
+    if(isConfirm) {
+      if(this.state.confirmDeleteGroup) {
+        Promise.resolve()
+          .then(() => FirebaseUtil.delete('groups/' + this.props.params.id))
+          .then(() => FirebaseUtil.signOut())
+          .then(() => browserHistory.push('/idk'))
+          .catch(route => {
+            if(!(route instanceof String)){
+              route = '/idk/help';
+            }
+            browserHistory.push(route);
+          });
+        this.setState({
+          confirmDeleteGroup: false
+        });
+      }
+      else if(this.state.confirmClear) {
+        Promise.resolve()
+          .then(() => FirebaseUtil.delete('groups/' + this.props.params.id + '/options'))
+          .then(() => FirebaseUtil.set('groups/' + this.props.params.id + '/selectedIndex', -1));
+        this.setState({
+          confirmClear: false
+        });
+      }
+    }
   }
 
   render() {
     return (
-      this.state.loaded 
-        ? <div className={'flex-container-column'}>
-            <h1>
-              <span className={'accent'}>Group {this.props.params.id}</span>
-              <MdInsertLink
-                className={'gap clickable-icon'}
-                data-clipboard-text={window.location.href}
-                data-tip="Copy link to clipboard"
-              />
-              <ReactTooltip place="bottom" effect="solid" />
-            </h1>
-            <div className={'flex-container-row flex-space-around'} style={style.content}>
-              <div className={'flex-fill flex-container-column'} style={style.column}>
-                <h2 className={'gap'}><span className={'accent'}>Created On</span>: {this.state.created}</h2>
-
-                <h2 className={'gap'}><span className={'accent'}>Decide Count</span>: {this.state.decideCount}</h2>
-
-                <button
-                  className={'gap ' + (this.state.options.length === 0 ? 'disabled' : '')}
-                  onClick={this.handleDecide}
-                  disabled={this.state.options.length === 0}
-                >
-                  Decide
-                </button>
-
-                <div className={'gap'}>Only keeps history of the last {messageCountThreshould} messages.</div>
-                <Chat
-                  height={'60%'}
-                  width={'70%'}
-                  fontSize={'105%'}
-                  title={'Chat'}
-                  elements={this.state.messages}
-                  keyMap={i => i.created}
-                  renderMap={(i, index) => <div>{i.name}</div>}
-                  onSend={this.handleSend}
-                />
-              </div>
-
-              <div className={'flex-fill flex-container-column'} style={style.column}>
-                <form className={'gap flex-container-row flex-space-between'} onSubmit={this.handleOptionAdd}>
-                  <input
-                    className={'gap full-width'}
-                    style={style.optionInput}
-                    type="text"
-                    value={this.state.optionInputString}
-                    placeholder="Input an option"
-                    onChange={this.handleOptionInputChange}
-                  />
-                  <input className={'gap'} type="submit" value="Add" />
-                </form>
-
-                <Table
-                  height={'70%'}
-                  width={'80%'}
-                  fontSize={'125%'}
-                  title={'Options'}
-                  elements={this.state.options}
-                  keyMap={i => i.created}
-                  renderMap={(i, index, isHovered) => 
-                    <div className={'flex-container-row flex-space-between'}>
-                      <input
-                        className={'flex-fill invisible-background-color ' + (index === this.state.selectedIndex ? 'selected' : '')}
-                        style={style.optionRow}
-                        type="text"
-                        value={i.name}
-                        onChange={e => this.handleChangeName(e, index)}
-                      />
-                      <TiTimes
-                        className={isHovered ? 'clickable-icon' : 'invisible-color'}
-                        onClick={() => this.handleDeleteOption(index)}
-                      />
-                    </div>
-                  }
-                />
-
-                <button
-                  className={'gap ' + (this.state.options.length === 0 ? 'disabled' : 'alert')}
-                  onClick={this.handleClear}
-                  disabled={this.state.options.length === 0}
-                >
-                  Clear options
-                </button> 
-              </div>
-            </div>
-
-            <button className={'gap alert'} style={style.trash} onClick={this.handleDeleteGroup}>
-              <TiTrash />
-            </button>
-          </div>
-        : 
+      !this.state.loaded
+        ? 
           <div className={'flex-container-column flex-center'}>
             <p>Loading...</p>
           </div>
+        : this.state.choosingUser
+          ?
+            <form className={'flex-container-column flex-center'} onSubmit={this.handleChooseUser}>
+              <h1 className={'accent'}>Enter your name</h1>
+              <input
+                className={'gap'}
+                style={style.userInput}
+                type="text"
+                value={this.state.user}
+                placeholder="User"
+                onChange={this.handleUserInputChange}
+              />
+              <input className={'gap'} type="submit" value="Start" />
+            </form>
+          :
+            <div className={'flex-container-column'}>
+              <Confirm
+                isOpen={this.state.confirmModalIsOpen}
+                onSubmit={this.handleConfirmSubmit}
+              />
+              <h1>
+                <span className={'accent'}>Group {this.props.params.id}</span>
+                <MdInsertLink
+                  className={'gap clickable-icon'}
+                  data-clipboard-text={window.location.href}
+                  data-tip="Copy link to clipboard"
+                />
+                <ReactTooltip place="bottom" effect="solid" />
+              </h1>
+              <div className={'flex-container-row flex-space-around'} style={style.content}>
+                <div className={'flex-fill flex-container-column'} style={style.column}>
+                  <h2 className={'gap'}><span className={'accent'}>Created On</span>: {this.state.created}</h2>
+
+                  <h2 className={'gap'}><span className={'accent'}>Decide Count</span>: {this.state.decideCount}</h2>
+
+                  <button
+                    className={'gap ' + (this.state.options.length === 0 ? 'disabled' : '')}
+                    onClick={this.handleDecide}
+                    disabled={this.state.options.length === 0}
+                  >
+                    Decide
+                  </button>
+
+                  <div className={'gap'}>Only keeps history of the last {messageCountThreshould} messages.</div>
+                  <Chat
+                    height={'60%'}
+                    width={'70%'}
+                    fontSize={'105%'}
+                    title={'Chat'}
+                    elements={this.state.messages}
+                    keyMap={i => i.created}
+                    renderMap={(i, index) => <div>{i.name}</div>}
+                    onSend={this.handleSend}
+                  />
+                </div>
+
+                <div className={'flex-fill flex-container-column'} style={style.column}>
+                  <form className={'gap flex-container-row flex-space-between'} onSubmit={this.handleOptionAdd}>
+                    <input
+                      className={'gap full-width'}
+                      style={style.optionInput}
+                      type="text"
+                      value={this.state.optionInputString}
+                      placeholder="Input an option"
+                      onChange={this.handleOptionInputChange}
+                    />
+                    <input className={'gap'} type="submit" value="Add" />
+                  </form>
+
+                  <Table
+                    height={'70%'}
+                    width={'80%'}
+                    fontSize={'125%'}
+                    title={'Options'}
+                    elements={this.state.options}
+                    keyMap={i => i.created}
+                    renderMap={(i, index, isHovered) => 
+                      <div className={'flex-container-row flex-space-between'}>
+                        <input
+                          className={'flex-fill invisible-background-color ' + (index === this.state.selectedIndex ? 'selected' : '')}
+                          style={style.optionRow}
+                          type="text"
+                          value={i.name}
+                          onChange={e => this.handleChangeName(e, index)}
+                        />
+                        <TiTimes
+                          className={isHovered ? 'clickable-icon' : 'invisible-color'}
+                          onClick={() => this.handleDeleteOption(index)}
+                        />
+                      </div>
+                    }
+                  />
+
+                  <button
+                    className={'gap ' + (this.state.options.length === 0 ? 'disabled' : 'alert')}
+                    onClick={this.handleClear}
+                    disabled={this.state.options.length === 0}
+                  >
+                    Clear options
+                  </button> 
+                </div>
+              </div>
+
+              <button className={'gap alert'} style={style.trash} onClick={this.handleDeleteGroup}>
+                <TiTrash />
+              </button>
+            </div>
     );
   }
 }

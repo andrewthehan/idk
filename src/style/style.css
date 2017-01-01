@@ -196,3 +196,27 @@ td {
 .invisible-background-color {
   background-color: rgba(0, 0, 0, 0);
 }
+
+.modal-overlay {
+  position: fixed;
+  top: 33%;
+  left: 33%;
+  bottom: 33%;
+  right: 33%;
+}
+
+.modal-content {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+
+  border: 2px solid #00ADB5;
+  background: white;
+  outline: none;
+}
